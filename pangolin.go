@@ -41,21 +41,26 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	log.Debug("Received response")
 
 	c := make(chan dnsQueryResponse)
-
-	defer close(c)
+	cancelCtx, cancel := context.WithCancel(context.TODO())
+	defer func() {
+		cancel()
+		close(c)
+	}()
 
 	for _, dnsServer := range servers {
-		go queryDns(r.Question[0].Name, dnsServer, c)
+		go queryDns(r.Question[0].Name, dnsServer, cancelCtx, c)
 	}
-	// Wrap.
-	pw := NewResponsePrinter(w)
 
 	for range servers {
 		select {
 		case rt := <-c:
 			if rt.err == nil && len(rt.ips) > 0 { //已找到dns信息
 				msg := newMsg(r, rt)
-				w.WriteMsg(msg)
+				err := w.WriteMsg(msg)
+				if err != nil {
+					log.Errorf("write response raise error %s", err)
+					return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
+				}
 				return dns.RcodeSuccess, nil
 			}
 		}
@@ -64,7 +69,7 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	// Export metric with the server label set to the current server handling the request.
 	//requestCount.WithLabelValues(metrics.WithServer(ctx)).Inc()
 
-	return plugin.NextOrFailure(e.Name(), e.Next, ctx, pw, r)
+	return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 }
 
 func newMsg(r *dns.Msg, res dnsQueryResponse) *dns.Msg {
@@ -88,13 +93,6 @@ type ResponsePrinter struct {
 	dns.ResponseWriter
 }
 
-// NewResponsePrinter returns ResponseWriter.
-func NewResponsePrinter(w dns.ResponseWriter) *ResponsePrinter {
-	// 实际实现逻辑
-
-	return &ResponsePrinter{ResponseWriter: w}
-}
-
 // WriteMsg calls the underlying ResponseWriter's WriteMsg method and prints "Pangolin" to standard output.
 func (r *ResponsePrinter) WriteMsg(res *dns.Msg) error {
 	log.Info("Pangolin")
@@ -102,9 +100,9 @@ func (r *ResponsePrinter) WriteMsg(res *dns.Msg) error {
 }
 
 // queryDns 根据host和dns server查询ip
-func queryDns(name, dns string, c chan<- dnsQueryResponse) {
+func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) {
 
-	log.Infof("query %s from dns server %s", name, dns)
+	log.Debugf("query %s from dns server %s", name, dns)
 	r := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -116,11 +114,18 @@ func queryDns(name, dns string, c chan<- dnsQueryResponse) {
 	}
 	res, err := r.LookupIPAddr(context.Background(), name)
 
-	log.Infof("query %s at %v,error %+v", name, res, err)
+	if err != nil {
+		log.Errorf("query %s at %v,error %+v", name, res, err)
+	} else {
+		log.Debugf("query %s at %v,error %+v", name, res, err)
+	}
 
-	c <- dnsQueryResponse{
+	select {
+	case <-ctx.Done():
+	case c <- dnsQueryResponse{
 		res,
 		name,
 		err,
+	}:
 	}
 }
