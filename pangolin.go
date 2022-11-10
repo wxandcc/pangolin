@@ -120,6 +120,7 @@ func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) 
 		log.Debugf("query %s on dns %s, at %v,error %+v", name, dns, res)
 		select {
 		case <-ctx.Done():
+			log.Debugf("query %s on dns %s, time out, operation cancelled", name, dns)
 			return
 		case c <- dnsQueryResponse{
 			res,
