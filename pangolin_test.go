@@ -15,7 +15,7 @@ import (
 func TestPangolin(t *testing.T) {
 	// Create a new Pangolin Plugin. Use the test.ErrorHandler as the next plugin.
 	x := Pangolin{Next: test.ErrorHandler()}
-	c := caddy.NewTestController("dns", `pangolin 10.172.49.6:53 10.242.25.1:53`)
+	c := caddy.NewTestController("dns", `pangolin 10.172.49.6:53 10.172.49.6:53`)
 	setup(c)
 	ctx := context.TODO()
 	r := new(dns.Msg)
@@ -25,7 +25,9 @@ func TestPangolin(t *testing.T) {
 	rec := dnstest.NewRecorder(&test.ResponseWriter{})
 
 	// Call our plugin directly, and check the result.
-	x.ServeDNS(ctx, rec, r)
+	go x.ServeDNS(ctx, rec, r)
+	go x.ServeDNS(ctx, rec, r)
+	go x.ServeDNS(ctx, rec, r)
 
 	time.Sleep(time.Second * time.Duration(5))
 }

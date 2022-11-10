@@ -40,7 +40,7 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	// Debug log that we've seen the query. This will only be shown when the debug plugin is loaded.
 	log.Debug("Received response")
 
-	c := make(chan dnsQueryResponse)
+	var c = make(chan dnsQueryResponse)
 	cancelCtx, cancel := context.WithCancel(context.TODO())
 	defer close(c)
 
