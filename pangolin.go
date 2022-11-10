@@ -116,7 +116,7 @@ func queryDns(name, dns string, c chan<- dnsQueryResponse) {
 	}
 	res, err := r.LookupIPAddr(context.Background(), name)
 
-	log.Infof("query %s at %v", name, res)
+	log.Infof("query %s at %v,error %+v", name, res, err)
 
 	c <- dnsQueryResponse{
 		res,
