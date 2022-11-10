@@ -77,7 +77,6 @@ func newMsg(r *dns.Msg, res dnsQueryResponse) *dns.Msg {
 			A:   v.IP,
 		})
 	}
-	log.Infof("the name %s dns address is %+v", res.name, msg)
 	return msg
 }
 
@@ -104,6 +103,8 @@ func (r *ResponsePrinter) WriteMsg(res *dns.Msg) error {
 
 // queryDns 根据host和dns server查询ip
 func queryDns(name, dns string, c chan<- dnsQueryResponse) {
+
+	log.Infof("query %s from dns server %s", name, dns)
 	r := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
