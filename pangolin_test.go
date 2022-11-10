@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/coredns/caddy"
 	"testing"
+	"time"
 
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/test"
@@ -25,4 +26,6 @@ func TestPangolin(t *testing.T) {
 
 	// Call our plugin directly, and check the result.
 	x.ServeDNS(ctx, rec, r)
+
+	time.Sleep(time.Second * time.Duration(5))
 }

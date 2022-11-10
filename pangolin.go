@@ -107,7 +107,7 @@ func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) 
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
-				Timeout: time.Millisecond * time.Duration(10000),
+				Timeout: time.Millisecond * time.Duration(2000),
 			}
 			return d.DialContext(ctx, network, dns)
 		},
@@ -115,17 +115,19 @@ func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) 
 	res, err := r.LookupIPAddr(context.Background(), name)
 
 	if err != nil {
-		log.Errorf("query %s at %v,error %+v", name, res, err)
+		log.Errorf("query %s dns %s ,error %+v", name, dns, err)
 	} else {
-		log.Debugf("query %s at %v,error %+v", name, res, err)
+		log.Debugf("query %s on dns %s, at %v,error %+v", name, dns, res)
+		select {
+		case <-ctx.Done():
+			return
+		case c <- dnsQueryResponse{
+			res,
+			name,
+			err,
+		}:
+			return
+		}
 	}
 
-	select {
-	case <-ctx.Done():
-	case c <- dnsQueryResponse{
-		res,
-		name,
-		err,
-	}:
-	}
 }
