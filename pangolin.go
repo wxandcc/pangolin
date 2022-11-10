@@ -42,10 +42,7 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	c := make(chan dnsQueryResponse)
 	cancelCtx, cancel := context.WithCancel(context.TODO())
-	defer func() {
-		cancel()
-		close(c)
-	}()
+	defer close(c)
 
 	for _, dnsServer := range servers {
 		go queryDns(r.Question[0].Name, dnsServer, cancelCtx, c)
@@ -61,6 +58,7 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 					log.Errorf("write response raise error %s", err)
 					return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 				}
+				cancel()
 				return dns.RcodeSuccess, nil
 			}
 		}
@@ -117,7 +115,7 @@ func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) 
 	if err != nil {
 		log.Errorf("query %s dns %s ,error %+v", name, dns, err)
 	} else {
-		log.Debugf("query %s on dns %s, at %v,error %+v", name, dns, res)
+		log.Debugf("query %s on dns %s, at %v", name, dns, res)
 		select {
 		case <-ctx.Done():
 			log.Debugf("query %s on dns %s, time out, operation cancelled", name, dns)
