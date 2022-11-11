@@ -40,9 +40,8 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	// Debug log that we've seen the query. This will only be shown when the debug plugin is loaded.
 	log.Debug("Received response")
 
-	var c = make(chan dnsQueryResponse)
+	var c = make(chan dnsQueryResponse, len(servers))
 	cancelCtx, cancel := context.WithCancel(context.TODO())
-	defer close(c)
 
 	for _, dnsServer := range servers {
 		go queryDns(r.Question[0].Name, dnsServer, cancelCtx, c)
@@ -51,14 +50,14 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	for range servers {
 		select {
 		case rt := <-c:
-			if rt.err == nil && len(rt.ips) > 0 { //已找到dns信息
+			if rt.err == nil && len(rt.ips) > 0 {
+				cancel()
 				msg := newMsg(r, rt)
 				err := w.WriteMsg(msg)
 				if err != nil {
 					log.Errorf("write response raise error %s", err)
 					return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 				}
-				cancel()
 				return dns.RcodeSuccess, nil
 			}
 		}
@@ -66,7 +65,7 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	// Export metric with the server label set to the current server handling the request.
 	//requestCount.WithLabelValues(metrics.WithServer(ctx)).Inc()
-
+	cancel()
 	return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 }
 
@@ -110,23 +109,18 @@ func queryDns(name, dns string, ctx context.Context, c chan<- dnsQueryResponse) 
 			return d.DialContext(ctx, network, dns)
 		},
 	}
-	res, err := r.LookupIPAddr(context.Background(), name)
-
-	if err != nil {
-		log.Errorf("query %s dns %s ,error %+v", name, dns, err)
-	} else {
-		log.Debugf("query %s on dns %s, at %v", name, dns, res)
-		select {
-		case <-ctx.Done():
-			log.Debugf("query %s on dns %s, time out, operation cancelled", name, dns)
-			return
-		case c <- dnsQueryResponse{
-			res,
-			name,
-			err,
-		}:
-			return
-		}
+	ips, err := r.LookupIPAddr(context.Background(), name)
+	log.Debugf("query %s on dns %s, the return ip is %#v; the error is [%s]", name, dns, ips, err)
+	select {
+	case <-ctx.Done():
+		log.Debugf("query %s on dns %s, dns record already found, operation cancelled", name, dns)
+		return
+	case c <- dnsQueryResponse{
+		ips,
+		name,
+		err,
+	}:
+		return
 	}
 
 }
