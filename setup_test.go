@@ -9,7 +9,7 @@ import (
 // TestSetup tests the various things that should be parsed by setup.
 // Make sure you also test for parse errors.
 func TestSetup(t *testing.T) {
-	c := caddy.NewTestController("dns", `pangolin 8.8.8.8 8.8.8.4.4`)
+	c := caddy.NewTestController("dns", `pangolin 8.8.8.8  8.8.8.8 8.8.8.4 125.125.125.125:9`)
 	if err := setup(c); err != nil {
 		t.Fatalf("Expected no errors, but got: %v", err)
 	}
