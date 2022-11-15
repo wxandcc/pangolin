@@ -56,9 +56,8 @@ func (e Pangolin) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				err := w.WriteMsg(msg)
 				if err != nil {
 					log.Errorf("write response raise error %s", err)
-					return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 				}
-				return dns.RcodeSuccess, nil
+				return plugin.NextOrFailure(e.Name(), e.Next, ctx, w, r)
 			}
 		}
 	}
